@@ -1,54 +1,108 @@
-const path = require('path')
+const path = require("path");
 
-const express = require('express')
-const dotenv = require('dotenv')
-const morgan = require('morgan')
-const exphbs = require('express-handlebars')
-const passport = require('passport')
-const session = require('express-session')
+const express = require("express");
+const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+const morgan = require("morgan");
+const exphbs = require("express-handlebars");
+const passport = require("passport");
+const session = require("express-session");
+const methodOverride = require("method-override");
+const MongoStore = require("connect-mongo")(session);
 
-const connectDB = require('./config/db')
-
+const connectDB = require("./config/db");
 
 // Load config
-dotenv.config({path: './config/config.env'})
+dotenv.config({ path: "./config/config.env" });
 
 // Passport config
-require('./config/passport')(passport)
+require("./config/passport")(passport);
 
-connectDB()
+connectDB();
 
-const app = express()
+const app = express();
+
+// Body Parser
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
+
+// Method Override
+
+app.use(
+    methodOverride(function (req, res) {
+        if (req.body && typeof req.body === "object" && "_method" in req.body) {
+            // look in urlencoded POST bodies and delete it
+            var method = req.body._method;
+            delete req.body._method;
+            return method;
+        }
+    })
+);
 
 // Logging
-if(process.env.NODE_ENV === 'development'){
-    app.use(morgan('dev'))
+if (process.env.NODE_ENV === "development") {
+    app.use(morgan("dev"));
 }
 
+// Handlebars Halper
+const {
+    formatDate,
+    stripTag,
+    truncate,
+    editIcon,
+    select,
+} = require("./helper/hbs");
+
 // Handlebars
-app.engine('.hbs', exphbs({defaultLayout: 'main', extname: '.hbs'}));
-app.set('view engine', '.hbs')
+app.engine(
+    ".hbs",
+    exphbs({
+        helpers: {
+            formatDate,
+            stripTag,
+            truncate,
+            editIcon,
+            select,
+        },
+        defaultLayout: "main",
+        extname: ".hbs",
+    })
+);
+app.set("view engine", ".hbs");
 
 // Express sessions middleware
 app.use(
     session({
-    secret: 'keyboard cat',
-    resave: false,
-    saveUninitialize: false
-}))
+        secret: "keyboard cat",
+        resave: false,
+        saveUninitialize: false,
+        store: new MongoStore({ mongooseConnection: mongoose.connection }),
+    })
+);
 
 // Passport middleware
-app.use(passport.initialize())
-app.use(passport.session())
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Set global variable
+app.use(function (req, res, next) {
+    res.locals.user = req.user || null;
+    next();
+});
 
 // Static folder
-app.use(express.static(path.join(__dirname, 'public')))
+app.use(express.static(path.join(__dirname, "public")));
 
 // Routes
-app.use('/', require('./routes/index'))
-app.use('/auth', require('./routes/auth'))
+app.use("/", require("./routes/index"));
+app.use("/auth", require("./routes/auth"));
+app.use("/stories", require("./routes/stories"));
 
+const PORT = process.env.PORT || 3000;
 
-const PORT = process.env.PORT || 3000
-
-app.listen(PORT, console.log(`Server started in ${process.env.NODE_ENV} mode on port ${PORT}`))
+app.listen(
+    PORT,
+    console.log(
+        `Server started in ${process.env.NODE_ENV} mode on port ${PORT}`
+    )
+);
