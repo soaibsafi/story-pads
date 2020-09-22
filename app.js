@@ -17,6 +17,7 @@ dotenv.config({ path: "./config/config.env" });
 
 // Passport config
 require("./config/passport")(passport);
+//console.log(process.env.GOOGLE_CLIENT_ID),
 
 connectDB();
 
